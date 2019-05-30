@@ -116,6 +116,12 @@ template <> class float_v<8> {
     return _mm256_sub_ps(a.m256(), b.m256());
   }
 
+  float_v<4> low() const { return _mm256_extractf128_ps(m_value, 0); }
+
+  float_v<4> high() const {
+    return _mm256_extractf128_ps(m_value, 1);
+  }
+
   float_v floor() const { return _mm256_floor_ps(m_value); }
   float_v ceil() const { return _mm256_ceil_ps(m_value); }
 

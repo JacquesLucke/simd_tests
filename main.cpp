@@ -38,11 +38,17 @@ static float_v<N>
 bilinear_interpolation(float_v<N> t1, float_v<N> t2, float_v<N> v_ll,
                        float_v<N> v_lh, float_v<N> v_hl,
                        float_v<N> v_hh) {
-  float_v<N> low = linear_interpolation(t2, v_ll, v_lh);
-  float_v<N> high = linear_interpolation(t2, v_hl, v_hh);
+  float_v<N * 2> joined_ll_hl{v_ll, v_hl};
+  float_v<N * 2> joined_lh_hh{v_lh, v_hh};
+  float_v<N * 2> joined_t2{t2, t2};
+  float_v<N * 2> joined =
+      linear_interpolation(joined_t2, joined_ll_hl, joined_lh_hh);
+  float_v<N> low = joined.low();
+  float_v<N> high = joined.high();
   float_v<N> v = linear_interpolation(t1, low, high);
   return v;
 }
+
 template <unsigned int N>
 static float_v<N>
 trilinear_interpolation(float_v<N> t1, float_v<N> t2, float_v<N> t3,
@@ -129,7 +135,7 @@ int main(int argc, char const *argv[]) {
   float step = 0.1f;
   for (float y = 0.0f; y <= 3.0f; y += step) {
     for (float x = 0.0f; x <= 1.0f; x += step) {
-      float result = eval_noise<8>(x, y, 0.0f).get<0>();
+      float result = eval_noise<4>(x, y, 0.0f).get<0>();
       std::cout << std::fixed << std::setw(8) << std::setprecision(3)
                 << result << " ";
     }
