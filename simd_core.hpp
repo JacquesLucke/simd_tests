@@ -12,7 +12,8 @@ template <unsigned int N> class float_v;
 template <unsigned int N> class int32_v;
 
 template <unsigned int N> class float_v {
-  static const unsigned int N_Half = N / 2;
+  static const int N_Half = N / 2;
+  static_assert(N_Half * 2 == N, "N is not a power of two");
 
  private:
   float_v<N_Half> m_low;
@@ -55,12 +56,13 @@ template <unsigned int N> class float_v {
     return stream;
   }
 
-  template <unsigned int Index> float get() const {
-    static_assert(Index < N);
+  template <int Index> float get() const {
+    static_assert(Index < N, "invalid index");
     if (Index < N_Half) {
       return m_low.get<Index>();
     } else {
-      return m_high.get<Index - N_Half>();
+      return m_high.get < Index - N_Half < 0 ? 0
+                                             : Index - N_Half > ();
     }
   }
 };
@@ -96,7 +98,7 @@ template <> class float_v<1> {
     return stream;
   }
 
-  template <unsigned char Index> float get() {
+  template <int Index> float get() {
     static_assert(Index == 0, "invalid index");
     return m_value;
   }
@@ -140,7 +142,7 @@ template <> class float_v<4> {
     return stream;
   }
 
-  template <unsigned char Index> float get() const {
+  template <int Index> float get() const {
     static_assert(Index < 4, "invalid index");
     __m128 shuffled = _mm_shuffle_ps(m_value, m_value, Index);
     return _mm_cvtss_f32(shuffled);
@@ -196,11 +198,55 @@ template <> class float_v<8> {
     return stream;
   }
 
-  template <unsigned char Index> float get() const {
+  template <int Index> float get() const {
     static_assert(Index < 8, "invalid index");
     float array[8];
     _mm256_store_ps(array, m_value);
     return array[Index];
+  }
+};
+
+template <unsigned int N> class int32_v {
+ private:
+  static const int N_Half = N / 2;
+
+  int32_v<N_Half> m_low;
+  int32_v<N_Half> m_high;
+
+ public:
+  int32_v() = default;
+  int32_v(int32_t v) : m_low(v), m_high(v) {}
+  int32_v(int32_v<N_Half> low, int32_v<N_Half> high)
+      : m_low(low), m_high(high) {}
+
+  int32_v<N_Half> low() const { return m_low; }
+  int32_v<N_Half> high() const { return m_high; }
+
+  friend int32_v operator+(int32_v a, int32_v b) {
+    return int32_v(a.low() + b.low(), a.high() + b.high());
+  }
+
+  friend int32_v operator*(int32_v a, int32_v b) {
+    return int32_v(a.low() * b.low(), a.high() * b.high());
+  }
+
+  float_v<N> as_float() const {
+    return float_v<N>(m_low.as_float(), m_high.as_float());
+  }
+
+  friend std::ostream &operator<<(std::ostream &stream, int32_v v) {
+    stream << "(" << v.low() << ", " << v.high() << ")";
+    return stream;
+  }
+
+  template <int Index> int32_t get() const {
+    static_assert(Index < N, "invalid index");
+    if (Index < N_Half) {
+      return m_low.get<Index>();
+    } else {
+      return m_high.get < Index - N_Half < 0 ? 0
+                                             : Index - N_Half > ();
+    }
   }
 };
 
@@ -226,6 +272,11 @@ template <> class int32_v<1> {
   friend std::ostream &operator<<(std::ostream &stream, int32_v v) {
     stream << v.m_value;
     return stream;
+  }
+
+  template <int Index> int32_t get() const {
+    static_assert(Index == 0, "invalid index");
+    return m_value;
   }
 };
 
@@ -260,7 +311,7 @@ template <> class int32_v<4> {
     return stream;
   }
 
-  template <unsigned char Index> int32_t get() const {
+  template <int Index> int32_t get() const {
     static_assert(Index < 4, "invalid index");
     return _mm_extract_epi32(m_value, Index);
   }
@@ -299,7 +350,7 @@ template <> class int32_v<8> {
     return stream;
   }
 
-  template <unsigned char Index> int32_t get() const {
+  template <int Index> int32_t get() const {
     static_assert(Index < 8, "invalid index");
     return _mm256_extract_epi32(m_value, Index);
   }
@@ -312,6 +363,11 @@ int32_v<1> float_v<1>::cast_to_int32() const {
   } value;
   value.f = m_value;
   return value.i;
+}
+
+template <unsigned int N>
+int32_v<N> float_v<N>::cast_to_int32() const {
+  return int32_v<N>(m_low.cast_to_int32(), m_high.cast_to_int32());
 }
 
 int32_v<4> float_v<4>::cast_to_int32() const {
