@@ -16,7 +16,7 @@
 template <unsigned int N>
 static float_v<N> hash_position(int32_v<N> x, int32_v<N> y,
                                 int32_v<N> z) {
-  int32_v<4> h1 = x * (int32_t)4528654243247 +
+  int32_v<N> h1 = x * (int32_t)4528654243247 +
                   y * (int32_t)54299802411 +
                   z * (int32_t)8736254234431;
   float_v<N> h2 = h1.as_float() * (1.0f / (float)(1 << 31));
@@ -83,12 +83,12 @@ static float_v<N> eval_noise(float_v<N> x, float_v<N> y,
   /* Reinterpret boundary coordinates as ints.
    * They can also be converted, but this is actually not necessary.
    */
-  int32_v<4> x_low_id = x_low.cast_to_int32();
-  int32_v<4> y_low_id = y_low.cast_to_int32();
-  int32_v<4> z_low_id = z_low.cast_to_int32();
-  int32_v<4> x_high_id = x_high.cast_to_int32();
-  int32_v<4> y_high_id = y_high.cast_to_int32();
-  int32_v<4> z_high_id = z_high.cast_to_int32();
+  int32_v<N> x_low_id = x_low.cast_to_int32();
+  int32_v<N> y_low_id = y_low.cast_to_int32();
+  int32_v<N> z_low_id = z_low.cast_to_int32();
+  int32_v<N> x_high_id = x_high.cast_to_int32();
+  int32_v<N> y_high_id = y_high.cast_to_int32();
+  int32_v<N> z_high_id = z_high.cast_to_int32();
 
   /* Compute cell corner values.
    * There are 4 * 8 = 32 corners to compute.
@@ -133,11 +133,9 @@ int main(int argc, char const *argv[]) {
   float step = 0.1f;
   for (float y = 0.0f; y <= 3.0f; y += step) {
     for (float x = 0.0f; x <= 1.0f; x += step) {
-      float_v<4> result =
-          eval_noise(float_v<4>(x), float_v<4>(y), float_v<4>(0.0f))
-              .get<0>();
+      float result = eval_noise<1>(x, y, 0.0f).value();
       std::cout << std::fixed << std::setw(8) << std::setprecision(3)
-                << result.get<0>() << " ";
+                << result << " ";
     }
     std::cout << "\n";
   }

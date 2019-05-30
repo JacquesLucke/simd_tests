@@ -10,11 +10,44 @@
 template <unsigned int N> class float_v;
 template <unsigned int N> class int32_v;
 
+template <> class float_v<1> {
+ private:
+  float m_value;
+
+ public:
+  float_v() = default;
+  float_v(float value) : m_value(value) {}
+
+  float value() const { return m_value; }
+
+  friend float_v operator+(float_v a, float_v b) {
+    return a.value() + b.value();
+  }
+  friend float_v operator*(float_v a, float_v b) {
+    return a.value() * b.value();
+  }
+  friend float_v operator-(float_v a, float_v b) {
+    return a.value() - b.value();
+  }
+
+  float_v floor() const { return std::floorf(m_value); }
+  float_v ceil() const { return std::ceilf(m_value); }
+
+  int32_v<1> cast_to_int32() const;
+
+  friend std::ostream &operator<<(std::ostream &stream,
+                                  float_v value) {
+    stream << value.m_value;
+    return stream;
+  }
+};
+
 template <> class float_v<4> {
  private:
   __m128 m_value;
 
  public:
+  float_v() = default;
   float_v(__m128 v) : m_value(v) {}
   float_v(float v) { m_value = _mm_set_ps1(v); }
   float_v(float a, float b, float c, float d) {
@@ -55,6 +88,31 @@ template <> class float_v<4> {
   }
 };
 
+template <> class int32_v<1> {
+ private:
+  int32_t m_value;
+
+ public:
+  int32_v() = default;
+  int32_v(int32_t v) : m_value(v) {}
+
+  int32_t value() const { return m_value; }
+
+  friend int32_v operator+(int32_v a, int32_v b) {
+    return a.value() + b.value();
+  }
+  friend int32_v operator*(int32_v a, int32_v b) {
+    return a.value() * b.value();
+  }
+
+  float_v<1> as_float() const { return (float)m_value; }
+
+  friend std::ostream &operator<<(std::ostream &stream, int32_v v) {
+    stream << v.m_value;
+    return stream;
+  }
+};
+
 template <> class int32_v<4> {
  private:
   __m128i m_value;
@@ -92,6 +150,15 @@ template <> class int32_v<4> {
     return _mm_extract_epi32(m_value, Index);
   }
 };
+
+int32_v<1> float_v<1>::cast_to_int32() const {
+  union {
+    float f;
+    int i;
+  } value;
+  value.f = m_value;
+  return value.i;
+}
 
 int32_v<4> float_v<4>::cast_to_int32() const {
   return _mm_castps_si128(m_value);
