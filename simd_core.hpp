@@ -23,15 +23,15 @@ template <> class float_v<4> {
 
   __m128 m128() const { return m_value; }
 
-  friend float_v operator+(const float_v &a, const float_v &b) {
+  friend float_v operator+(float_v a, float_v b) {
     return _mm_add_ps(a.m128(), b.m128());
   }
 
-  friend float_v operator*(const float_v &a, const float_v &b) {
+  friend float_v operator*(float_v a, float_v b) {
     return _mm_mul_ps(a.m128(), b.m128());
   }
 
-  friend float_v operator-(const float_v &a, const float_v &b) {
+  friend float_v operator-(float_v a, float_v b) {
     return _mm_sub_ps(a.m128(), b.m128());
   }
 
@@ -40,8 +40,7 @@ template <> class float_v<4> {
 
   int32_v<4> cast_to_int32() const;
 
-  friend std::ostream &operator<<(std::ostream &stream,
-                                  const float_v &v) {
+  friend std::ostream &operator<<(std::ostream &stream, float_v v) {
     char data[128];
     snprintf(data, sizeof(data), "(%.5f, %.5f, %.5f, %.5f)",
              v.get<0>(), v.get<1>(), v.get<2>(), v.get<3>());
@@ -70,18 +69,17 @@ template <> class int32_v<4> {
 
   __m128i m128i() const { return m_value; }
 
-  friend int32_v operator+(const int32_v &a, const int32_v &b) {
+  friend int32_v operator+(int32_v a, int32_v b) {
     return _mm_add_epi32(a.m128i(), b.m128i());
   }
 
-  friend int32_v operator*(const int32_v &a, const int32_v &b) {
+  friend int32_v operator*(int32_v a, int32_v b) {
     return _mm_mul_epi32(a.m128i(), b.m128i());
   }
 
   float_v<4> as_float() const { return _mm_cvtepi32_ps(m_value); }
 
-  friend std::ostream &operator<<(std::ostream &stream,
-                                  const int32_v &v) {
+  friend std::ostream &operator<<(std::ostream &stream, int32_v v) {
     char data[128];
     snprintf(data, sizeof(data), "(%d, %d, %d, %d)", v.get<0>(),
              v.get<1>(), v.get<2>(), v.get<3>());
