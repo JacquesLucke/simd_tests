@@ -95,6 +95,8 @@ template <> class float_v<8> {
  public:
   float_v() = default;
   float_v(__m256 v) : m_value(v) {}
+  float_v(float_v<4> low, float_v<4> high)
+      : m_value(_mm256_setr_m128(low.m128(), high.m128())) {}
   float_v(float v) : m_value(_mm256_set1_ps(v)) {}
   float_v(float v7, float v6, float v5, float v4, float v3, float v2,
           float v1, float v0)
@@ -131,8 +133,9 @@ template <> class float_v<8> {
 
   template <unsigned char Index> float get() const {
     static_assert(Index < 8, "invalid index");
-    __m256 shuffled = _mm256_shuffle_ps(m_value, m_value, Index);
-    return _mm256_cvtss_f32(shuffled);
+    float array[8];
+    _mm256_store_ps(array, m_value);
+    return array[Index];
   }
 };
 

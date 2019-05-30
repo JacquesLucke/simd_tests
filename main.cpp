@@ -120,15 +120,11 @@ static float_v<N> eval_noise(float_v<N> x, float_v<N> y,
 int main(int argc, char const *argv[]) {
   float_v<4> a{3, 4, 5, 2};
   float_v<4> b{7.4f, 8.0f, 2.23f, 3.5f};
-  int32_v<4> c{6, 7, 8, 9};
+  float_v<8> c{a, b};
+  PRINT_EXPR(a);
   PRINT_EXPR(a);
   PRINT_EXPR(b);
   PRINT_EXPR(c);
-  PRINT_EXPR(b.floor());
-  PRINT_EXPR(b.ceil());
-  PRINT_EXPR(b.floor().cast_to_int32());
-  PRINT_EXPR(b.ceil().cast_to_int32());
-  PRINT_EXPR(a * b);
 
   float step = 0.1f;
   for (float y = 0.0f; y <= 3.0f; y += step) {
