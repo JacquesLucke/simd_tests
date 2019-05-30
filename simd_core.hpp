@@ -209,6 +209,7 @@ template <> class float_v<8> {
 template <unsigned int N> class int32_v {
  private:
   static const int N_Half = N / 2;
+  static_assert(N_Half * 2 == N, "N is not a power of two");
 
   int32_v<N_Half> m_low;
   int32_v<N_Half> m_high;
