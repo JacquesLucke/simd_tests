@@ -133,7 +133,7 @@ int main(int argc, char const *argv[]) {
   float step = 0.1f;
   for (float y = 0.0f; y <= 3.0f; y += step) {
     for (float x = 0.0f; x <= 1.0f; x += step) {
-      float result = eval_noise<1>(x, y, 0.0f).value();
+      float result = eval_noise<8>(x, y, 0.0f).get<0>();
       std::cout << std::fixed << std::setw(8) << std::setprecision(3)
                 << result << " ";
     }

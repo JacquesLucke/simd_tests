@@ -1,5 +1,6 @@
 #pragma once
 
+#include <immintrin.h>
 #include <smmintrin.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -49,10 +50,9 @@ template <> class float_v<4> {
  public:
   float_v() = default;
   float_v(__m128 v) : m_value(v) {}
-  float_v(float v) { m_value = _mm_set_ps1(v); }
-  float_v(float a, float b, float c, float d) {
-    m_value = _mm_set_ps(a, b, c, d);
-  }
+  float_v(float v) : m_value(_mm_set_ps1(v)) {}
+  float_v(float a, float b, float c, float d)
+      : m_value(_mm_set_ps(a, b, c, d)) {}
 
   __m128 m128() const { return m_value; }
 
@@ -88,6 +88,54 @@ template <> class float_v<4> {
   }
 };
 
+template <> class float_v<8> {
+ private:
+  __m256 m_value;
+
+ public:
+  float_v() = default;
+  float_v(__m256 v) : m_value(v) {}
+  float_v(float v) : m_value(_mm256_set1_ps(v)) {}
+  float_v(float v7, float v6, float v5, float v4, float v3, float v2,
+          float v1, float v0)
+      : m_value(_mm256_set_ps(v7, v6, v5, v4, v3, v2, v1, v0)) {}
+
+  __m256 m256() const { return m_value; }
+
+  friend float_v operator+(float_v a, float_v b) {
+    return _mm256_add_ps(a.m256(), b.m256());
+  }
+
+  friend float_v operator*(float_v a, float_v b) {
+    return _mm256_mul_ps(a.m256(), b.m256());
+  }
+
+  friend float_v operator-(float_v a, float_v b) {
+    return _mm256_sub_ps(a.m256(), b.m256());
+  }
+
+  float_v floor() const { return _mm256_floor_ps(m_value); }
+  float_v ceil() const { return _mm256_ceil_ps(m_value); }
+
+  int32_v<8> cast_to_int32() const;
+
+  friend std::ostream &operator<<(std::ostream &stream, float_v v) {
+    char data[128];
+    snprintf(data, sizeof(data),
+             "(%.5f, %.5f, %.5f, %.5f, %.5f, %.5f, %.5f, %.5f)",
+             v.get<0>(), v.get<1>(), v.get<2>(), v.get<3>(),
+             v.get<4>(), v.get<5>(), v.get<6>(), v.get<7>());
+    stream << data;
+    return stream;
+  }
+
+  template <unsigned char Index> float get() const {
+    static_assert(Index < 8, "invalid index");
+    __m256 shuffled = _mm256_shuffle_ps(m_value, m_value, Index);
+    return _mm256_cvtss_f32(shuffled);
+  }
+};
+
 template <> class int32_v<1> {
  private:
   int32_t m_value;
@@ -120,10 +168,9 @@ template <> class int32_v<4> {
  public:
   int32_v() = default;
   int32_v(__m128i v) : m_value(v) {}
-  int32_v(int32_t v) { m_value = _mm_set1_epi32(v); }
-  int32_v(int32_t a, int32_t b, int32_t c, int32_t d) {
-    m_value = _mm_set_epi32(a, b, c, d);
-  }
+  int32_v(int32_t v) : m_value(_mm_set1_epi32(v)) {}
+  int32_v(int32_t a, int32_t b, int32_t c, int32_t d)
+      : m_value(_mm_set_epi32(a, b, c, d)) {}
 
   __m128i m128i() const { return m_value; }
 
@@ -151,6 +198,45 @@ template <> class int32_v<4> {
   }
 };
 
+template <> class int32_v<8> {
+ private:
+  __m256i m_value;
+
+ public:
+  int32_v() = default;
+  int32_v(__m256i v) : m_value(v) {}
+  int32_v(int32_t v) : m_value(_mm256_set1_epi32(v)) {}
+  int32_v(int32_t v7, int32_t v6, int32_t v5, int32_t v4, int32_t v3,
+          int32_t v2, int32_t v1, int32_t v0)
+      : m_value(_mm256_set_epi32(v7, v6, v5, v4, v3, v2, v1, v0)) {}
+
+  __m256i m256() const { return m_value; }
+
+  friend int32_v operator+(int32_v a, int32_v b) {
+    return _mm256_add_epi32(a.m256(), b.m256());
+  }
+
+  friend int32_v operator*(int32_v a, int32_v b) {
+    return _mm256_mul_epi32(a.m256(), b.m256());
+  }
+
+  float_v<8> as_float() const { return _mm256_cvtepi32_ps(m_value); }
+
+  friend std::ostream &operator<<(std::ostream &stream, int32_v v) {
+    char data[128];
+    snprintf(data, sizeof(data), "(%d, %d, %d, %d, %d, %d, %d, %d)",
+             v.get<0>(), v.get<1>(), v.get<2>(), v.get<3>(),
+             v.get<4>(), v.get<5>(), v.get<6>(), v.get<7>());
+    stream << data;
+    return stream;
+  }
+
+  template <unsigned char Index> int32_t get() const {
+    static_assert(Index < 8, "invalid index");
+    return _mm256_extract_epi32(m_value, Index);
+  }
+};
+
 int32_v<1> float_v<1>::cast_to_int32() const {
   union {
     float f;
@@ -162,4 +248,8 @@ int32_v<1> float_v<1>::cast_to_int32() const {
 
 int32_v<4> float_v<4>::cast_to_int32() const {
   return _mm_castps_si128(m_value);
+}
+
+int32_v<8> float_v<8>::cast_to_int32() const {
+  return _mm256_castps_si256(m_value);
 }
