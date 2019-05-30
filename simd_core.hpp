@@ -11,6 +11,60 @@
 template <unsigned int N> class float_v;
 template <unsigned int N> class int32_v;
 
+template <unsigned int N> class float_v {
+  static const unsigned int N_Half = N / 2;
+
+ private:
+  float_v<N_Half> m_low;
+  float_v<N_Half> m_high;
+
+ public:
+  float_v() = default;
+  float_v(float value) : m_low(value), m_high(value) {}
+  float_v(float_v<N_Half> low, float_v<N_Half> high)
+      : m_low(low), m_high(high) {}
+
+  float_v<N_Half> low() const { return m_low; }
+  float_v<N_Half> high() const { return m_high; }
+
+  friend float_v operator+(float_v a, float_v b) {
+    return float_v(a.low() + b.low(), a.high() + b.high());
+  }
+
+  friend float_v operator-(float_v a, float_v b) {
+    return float_v(a.low() - b.low(), a.high() - b.high());
+  }
+
+  friend float_v operator*(float_v a, float_v b) {
+    return float_v(a.low() * b.low(), a.high() * b.high());
+  }
+
+  float_v floor() const {
+    return float_v(m_low.floor(), m_high.floor());
+  }
+
+  float_v ceil() const {
+    return float_v(m_low.ceil(), m_high.ceil());
+  }
+
+  int32_v<N> cast_to_int32() const;
+
+  friend std::ostream &operator<<(std::ostream &stream,
+                                  float_v value) {
+    stream << "(" << value.low() << ", " << value.high() << ")";
+    return stream;
+  }
+
+  template <unsigned int Index> float get() const {
+    static_assert(Index < N);
+    if (Index < N_Half) {
+      return m_low.get<Index>();
+    } else {
+      return m_high.get<Index - N_Half>();
+    }
+  }
+};
+
 template <> class float_v<1> {
  private:
   float m_value;
@@ -40,6 +94,11 @@ template <> class float_v<1> {
                                   float_v value) {
     stream << value.m_value;
     return stream;
+  }
+
+  template <unsigned char Index> float get() {
+    static_assert(Index == 0, "invalid index");
+    return m_value;
   }
 };
 
