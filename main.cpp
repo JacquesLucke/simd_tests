@@ -28,39 +28,36 @@ template <unsigned int N> static float_v<N> fade(float_v<N> t) {
 }
 
 template <unsigned int N>
-static float_v<N> linear_interpolation(float_v<N> t, float_v<N> a,
-                                       float_v<N> b) {
-  return (1 - t) * a + t * b;
+static float_v<N> interpolate_linear(float_v<N> t, float_v<N> v_0,
+                                     float_v<N> v_1) {
+  return (1 - t) * v_0 + t * v_1;
 }
 
 template <unsigned int N>
 static float_v<N>
-bilinear_interpolation(float_v<N> t1, float_v<N> t2, float_v<N> v_ll,
-                       float_v<N> v_lh, float_v<N> v_hl,
-                       float_v<N> v_hh) {
-  float_v<N * 2> joined_ll_hl{v_ll, v_hl};
-  float_v<N * 2> joined_lh_hh{v_lh, v_hh};
-  float_v<N * 2> joined_t2{t2, t2};
-  float_v<N * 2> joined =
-      linear_interpolation(joined_t2, joined_ll_hl, joined_lh_hh);
-  float_v<N> low = joined.low();
-  float_v<N> high = joined.high();
-  float_v<N> v = linear_interpolation(t1, low, high);
-  return v;
+interpolate_bilinear(float_v<N> t1, float_v<N> t2, float_v<N> v_0_0,
+                     float_v<N> v_0_1, float_v<N> v_1_0,
+                     float_v<N> v_1_1) {
+  float_v<N> v_t1_0 = interpolate_linear(t1, v_0_0, v_1_0);
+  float_v<N> v_t1_1 = interpolate_linear(t1, v_0_1, v_1_1);
+  float_v<N> v_t1_t2 = interpolate_linear(t2, v_t1_0, v_t1_1);
+  return v_t1_t2;
 }
 
 template <unsigned int N>
 static float_v<N>
-trilinear_interpolation(float_v<N> t1, float_v<N> t2, float_v<N> t3,
-                        float_v<N> v_lll, float_v<N> v_llh,
-                        float_v<N> v_lhl, float_v<N> v_lhh,
-                        float_v<N> v_hll, float_v<N> v_hlh,
-                        float_v<N> v_hhl, float_v<N> v_hhh) {
-  float_v<N> low =
-      bilinear_interpolation(t2, t3, v_lll, v_llh, v_lhl, v_lhh);
-  float_v<N> high =
-      bilinear_interpolation(t2, t3, v_hll, v_hlh, v_hhl, v_hhh);
-  return linear_interpolation(t1, low, high);
+interpolate_trilinear(float_v<N> t1, float_v<N> t2, float_v<N> t3,
+                      float_v<N> v_0_0_0, float_v<N> v_0_0_1,
+                      float_v<N> v_0_1_0, float_v<N> v_0_1_1,
+                      float_v<N> v_1_0_0, float_v<N> v_1_0_1,
+                      float_v<N> v_1_1_0, float_v<N> v_1_1_1) {
+  float_v<N> v_t1_t2_0 = interpolate_bilinear(
+      t1, t2, v_0_0_0, v_0_1_0, v_1_0_0, v_1_1_0);
+  float_v<N> v_t1_t2_1 = interpolate_bilinear(
+      t1, t2, v_0_0_1, v_0_1_1, v_1_0_1, v_1_1_1);
+  float_v<N> v_t1_t2_t3 =
+      interpolate_linear(t3, v_t1_t2_0, v_t1_t2_1);
+  return v_t1_t2_t3;
 }
 
 /* Evaluate the noise function at 4 separate positions. */
@@ -116,7 +113,7 @@ static float_v<N> eval_noise(float_v<N> x, float_v<N> y,
       hash_position(x_high_id, y_high_id, z_high_id);
 
   /* Interpolate corner values for position in cell. */
-  float_v<N> result = trilinear_interpolation(
+  float_v<N> result = interpolate_trilinear(
       x_fac, y_fac, z_fac, corner_lll, corner_llh, corner_lhl,
       corner_lhh, corner_hll, corner_hlh, corner_hhl, corner_hhh);
 
