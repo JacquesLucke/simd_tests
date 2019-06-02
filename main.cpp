@@ -3,10 +3,12 @@
 #include <xmmintrin.h>
 
 #include <cassert>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include "simd_core.hpp"
 
@@ -16,11 +18,27 @@
 template <unsigned int N>
 static float_v<N> hash_position(int32_v<N> x, int32_v<N> y,
                                 int32_v<N> z) {
-  int32_v<N> h1 = x * (int32_t)4528654243247 +
-                  y * (int32_t)54299802411 +
-                  z * (int32_t)8736254234431;
-  float_v<N> h2 = h1.as_float() * (1.0f / (float)(1 << 31));
-  return h2;
+#define xor_rot(a, b, k)                                             \
+  a = a ^ b;                                                         \
+  a = a - b.rotate<k>();
+
+  int32_v<N> magic = int32_v<N>(0xdeadbeef);
+  int32_v<N> a = x * magic;
+  int32_v<N> b = y * magic;
+  int32_v<N> c = z * magic;
+
+  xor_rot(c, b, 14);
+  xor_rot(a, c, 11);
+  xor_rot(b, a, 25);
+  xor_rot(c, b, 16);
+  xor_rot(a, c, 4);
+  xor_rot(b, a, 14);
+  xor_rot(c, b, 24);
+
+  float_v<N> result = c.as_float();
+  return result * (1.0f / (1 << 31));
+
+#undef xor_rot
 }
 
 template <unsigned int N> static float_v<N> fade(float_v<N> t) {
@@ -83,15 +101,15 @@ static float_v<N> eval_noise(float_v<N> x, float_v<N> y,
   float_v<N> y_fac = fade(y_frac);
   float_v<N> z_fac = fade(z_frac);
 
-  /* Reinterpret boundary coordinates as ints.
-   * They can also be converted, but this is actually not necessary.
+  /* Get IDs of cell corners.
+   * TODO: Compare cast vs convert to int.
    */
-  int32_v<N> x_low_id = x_low.cast_to_int32();
-  int32_v<N> y_low_id = y_low.cast_to_int32();
-  int32_v<N> z_low_id = z_low.cast_to_int32();
-  int32_v<N> x_high_id = x_high.cast_to_int32();
-  int32_v<N> y_high_id = y_high.cast_to_int32();
-  int32_v<N> z_high_id = z_high.cast_to_int32();
+  int32_v<N> x_low_id = x_low.as_int32();
+  int32_v<N> y_low_id = y_low.as_int32();
+  int32_v<N> z_low_id = z_low.as_int32();
+  int32_v<N> x_high_id = x_high.as_int32();
+  int32_v<N> y_high_id = y_high.as_int32();
+  int32_v<N> z_high_id = z_high.as_int32();
 
   /* Compute cell corner values.
    * There are 4 * 8 = 32 corners to compute.
@@ -120,14 +138,69 @@ static float_v<N> eval_noise(float_v<N> x, float_v<N> y,
   return result;
 }
 
+float eval_perlin_1(float x, float y, float z) {
+  float v1 = eval_noise<1>(x, y, z).get<0>();
+  float v2 = eval_noise<1>(x * 2, y * 2, z * 2).get<0>();
+  float v3 = eval_noise<1>(x * 4, y * 4, z * 4).get<0>();
+  float v4 = eval_noise<1>(x * 8, y * 8, z * 8).get<0>();
+  return v1 + v2 * 0.5f + v3 * 0.25f + v4 * 0.125f;
+}
+float eval_perlin_2(float x, float y, float z) {
+  float_v<4> x_positions{x, x * 2, x * 4, x * 8};
+  float_v<4> y_positions{y, y * 2, y * 4, y * 8};
+  float_v<4> z_positions{z, z * 2, z * 4, z * 8};
+  float_v<4> values =
+      eval_noise(x_positions, y_positions, z_positions);
+  float v1 = values.get<0>();
+  float v2 = values.get<1>();
+  float v3 = values.get<2>();
+  float v4 = values.get<3>();
+  return v1 + v2 * 0.5f + v3 * 0.25f + v4 * 0.125f;
+}
+
+std::vector<float> noise_texture(unsigned int width,
+                                 unsigned int height, float scale) {
+  std::vector<float> pixels;
+  pixels.reserve(width * height);
+  for (unsigned int y = 0; y < height; y++) {
+    for (unsigned int x = 0; x < width; x++) {
+      float value = eval_perlin_1(x * scale, y * scale, 0.0f);
+      pixels.push_back(value);
+    }
+  }
+  return pixels;
+}
+
+std::string texture_as_json(std::vector<float> pixels,
+                            unsigned int width, unsigned int height) {
+  assert(pixels.size() == width * height);
+  std::stringstream ss;
+  ss << "{\"width\":" << width << ", \"height\":" << height
+     << ", \"pixels\":[";
+  for (unsigned int i = 0; i < pixels.size(); i++) {
+    ss << pixels[i];
+    if (i < pixels.size() - 1) {
+      ss << ",";
+    }
+  }
+  ss << "]}\n";
+  return ss.str();
+}
+
 int main(int argc, char const *argv[]) {
   float_v<4> a{3, 4, 5, 2};
   float_v<4> b{7.4f, 8.0f, 2.23f, 3.5f};
   float_v<8> c{a, b};
-  PRINT_EXPR(a);
-  PRINT_EXPR(a);
-  PRINT_EXPR(b);
-  PRINT_EXPR(c);
+  int32_v<4> d{5, 6, 7, 8};
+
+  unsigned int width = 1000;
+  unsigned int height = 1000;
+  auto pixels = noise_texture(width, height, 0.01f);
+  auto texture_json = texture_as_json(pixels, width, height);
+
+  std::ofstream myfile{"test.json"};
+  myfile << texture_json;
+  myfile.close();
 
   float step = 0.1f;
   for (float y = 0.0f; y <= 3.0f; y += step) {

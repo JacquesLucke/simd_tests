@@ -48,6 +48,7 @@ template <unsigned int N> class float_v {
     return float_v(m_low.ceil(), m_high.ceil());
   }
 
+  int32_v<N> as_int32() const;
   int32_v<N> cast_to_int32() const;
 
   friend std::ostream &operator<<(std::ostream &stream,
@@ -90,6 +91,7 @@ template <> class float_v<1> {
   float_v floor() const { return std::floorf(m_value); }
   float_v ceil() const { return std::ceilf(m_value); }
 
+  int32_v<1> as_int32() const;
   int32_v<1> cast_to_int32() const;
 
   friend std::ostream &operator<<(std::ostream &stream,
@@ -112,8 +114,8 @@ template <> class float_v<4> {
   float_v() = default;
   float_v(__m128 v) : m_value(v) {}
   float_v(float v) : m_value(_mm_set_ps1(v)) {}
-  float_v(float a, float b, float c, float d)
-      : m_value(_mm_set_ps(a, b, c, d)) {}
+  float_v(float v0, float v1, float v2, float v3)
+      : m_value(_mm_set_ps(v3, v2, v1, v0)) {}
 
   __m128 m128() const { return m_value; }
 
@@ -132,6 +134,7 @@ template <> class float_v<4> {
   float_v floor() const { return _mm_floor_ps(m_value); }
   float_v ceil() const { return _mm_ceil_ps(m_value); }
 
+  int32_v<4> as_int32() const;
   int32_v<4> cast_to_int32() const;
 
   friend std::ostream &operator<<(std::ostream &stream, float_v v) {
@@ -159,8 +162,8 @@ template <> class float_v<8> {
   float_v(float_v<4> low, float_v<4> high)
       : m_value(_mm256_setr_m128(low.m128(), high.m128())) {}
   float_v(float v) : m_value(_mm256_set1_ps(v)) {}
-  float_v(float v7, float v6, float v5, float v4, float v3, float v2,
-          float v1, float v0)
+  float_v(float v0, float v1, float v2, float v3, float v4, float v5,
+          float v6, float v7)
       : m_value(_mm256_set_ps(v7, v6, v5, v4, v3, v2, v1, v0)) {}
 
   __m256 m256() const { return m_value; }
@@ -186,6 +189,7 @@ template <> class float_v<8> {
   float_v floor() const { return _mm256_floor_ps(m_value); }
   float_v ceil() const { return _mm256_ceil_ps(m_value); }
 
+  int32_v<8> as_int32() const;
   int32_v<8> cast_to_int32() const;
 
   friend std::ostream &operator<<(std::ostream &stream, float_v v) {
@@ -227,8 +231,20 @@ template <unsigned int N> class int32_v {
     return int32_v(a.low() + b.low(), a.high() + b.high());
   }
 
+  friend int32_v operator-(int32_v a, int32_v b) {
+    return int32_v(a.low() - b.low(), a.high() - b.high());
+  }
+
   friend int32_v operator*(int32_v a, int32_v b) {
     return int32_v(a.low() * b.low(), a.high() * b.high());
+  }
+
+  friend int32_v operator^(int32_v a, int32_v b) {
+    return int32_v(a.low() ^ b.low(), a.high() ^ b.high());
+  }
+
+  template <unsigned int Count> int32_v rotate() const {
+    return int32_v(m_low.rotate<Count>(), m_high.rotate<Count>());
   }
 
   float_v<N> as_float() const {
@@ -264,8 +280,22 @@ template <> class int32_v<1> {
   friend int32_v operator+(int32_v a, int32_v b) {
     return a.value() + b.value();
   }
+
+  friend int32_v operator-(int32_v a, int32_v b) {
+    return a.value() - b.value();
+  }
+
   friend int32_v operator*(int32_v a, int32_v b) {
     return a.value() * b.value();
+  }
+
+  friend int32_v operator^(int32_v a, int32_v b) {
+    return a.value() ^ b.value();
+  }
+
+  template <unsigned int Count> int32_v rotate() const {
+    return ((uint32_t)m_value << Count) |
+           ((uint32_t)m_value >> (32 - Count));
   }
 
   float_v<1> as_float() const { return (float)m_value; }
@@ -289,8 +319,8 @@ template <> class int32_v<4> {
   int32_v() = default;
   int32_v(__m128i v) : m_value(v) {}
   int32_v(int32_t v) : m_value(_mm_set1_epi32(v)) {}
-  int32_v(int32_t a, int32_t b, int32_t c, int32_t d)
-      : m_value(_mm_set_epi32(a, b, c, d)) {}
+  int32_v(int32_t v0, int32_t v1, int32_t v2, int32_t v3)
+      : m_value(_mm_set_epi32(v3, v2, v1, v0)) {}
 
   __m128i m128i() const { return m_value; }
 
@@ -298,8 +328,22 @@ template <> class int32_v<4> {
     return _mm_add_epi32(a.m128i(), b.m128i());
   }
 
+  friend int32_v operator-(int32_v a, int32_v b) {
+    return _mm_sub_epi32(a.m128i(), b.m128i());
+  }
+
   friend int32_v operator*(int32_v a, int32_v b) {
-    return _mm_mul_epi32(a.m128i(), b.m128i());
+    return _mm_mullo_epi32(a.m128i(), b.m128i());
+  }
+
+  friend int32_v operator^(int32_v a, int32_v b) {
+    return _mm_xor_si128(a.m128i(), b.m128i());
+  }
+
+  template <unsigned int Count> int32_v rotate() const {
+    __m128i left = _mm_slli_epi32(m_value, Count);
+    __m128i right = _mm_srli_epi32(m_value, 32 - Count);
+    return _mm_or_si128(left, right);
   }
 
   float_v<4> as_float() const { return _mm_cvtepi32_ps(m_value); }
@@ -326,18 +370,32 @@ template <> class int32_v<8> {
   int32_v() = default;
   int32_v(__m256i v) : m_value(v) {}
   int32_v(int32_t v) : m_value(_mm256_set1_epi32(v)) {}
-  int32_v(int32_t v7, int32_t v6, int32_t v5, int32_t v4, int32_t v3,
-          int32_t v2, int32_t v1, int32_t v0)
+  int32_v(int32_t v0, int32_t v1, int32_t v2, int32_t v3, int32_t v4,
+          int32_t v5, int32_t v6, int32_t v7)
       : m_value(_mm256_set_epi32(v7, v6, v5, v4, v3, v2, v1, v0)) {}
 
-  __m256i m256() const { return m_value; }
+  __m256i m256i() const { return m_value; }
 
   friend int32_v operator+(int32_v a, int32_v b) {
-    return _mm256_add_epi32(a.m256(), b.m256());
+    return _mm256_add_epi32(a.m256i(), b.m256i());
+  }
+
+  friend int32_v operator-(int32_v a, int32_v b) {
+    return _mm256_sub_epi32(a.m256i(), b.m256i());
   }
 
   friend int32_v operator*(int32_v a, int32_v b) {
-    return _mm256_mul_epi32(a.m256(), b.m256());
+    return _mm256_mullo_epi32(a.m256i(), b.m256i());
+  }
+
+  friend int32_v operator^(int32_v a, int32_v b) {
+    return _mm256_xor_si256(a.m256i(), b.m256i());
+  }
+
+  template <unsigned int Count> int32_v rotate() const {
+    __m256i left = _mm256_slli_epi32(m_value, Count);
+    __m256i right = _mm256_srli_epi32(m_value, 32 - Count);
+    return _mm256_or_si256(left, right);
   }
 
   float_v<8> as_float() const { return _mm256_cvtepi32_ps(m_value); }
@@ -377,4 +435,16 @@ int32_v<4> float_v<4>::cast_to_int32() const {
 
 int32_v<8> float_v<8>::cast_to_int32() const {
   return _mm256_castps_si256(m_value);
+}
+
+int32_v<1> float_v<1>::as_int32() const {
+  return int32_v<1>((int32_t)m_value);
+}
+
+int32_v<4> float_v<4>::as_int32() const {
+  return _mm_cvtps_epi32(m_value);
+}
+
+int32_v<8> float_v<8>::as_int32() const {
+  return _mm256_cvtps_epi32(m_value);
 }
