@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "perlin_noise.hpp"
+#include "timeit.hpp"
 
 #define PRINT_EXPR(expression)                                       \
   std::cout << #expression << "\t " << (expression) << "\n"
@@ -19,10 +20,13 @@ std::vector<float> noise_texture(unsigned int width,
                                  unsigned int height, float scale) {
   std::vector<float> pixels;
   pixels.reserve(width * height);
-  for (unsigned int y = 0; y < height; y++) {
-    for (unsigned int x = 0; x < width; x++) {
-      float value = eval_perlin_1(x * scale, y * scale, 0.0f);
-      pixels.push_back(value);
+  {
+    SCOPED_TIMER("generate texture");
+    for (unsigned int y = 0; y < height; y++) {
+      for (unsigned int x = 0; x < width; x++) {
+        float value = perlin_noise(x * scale, y * scale, 0.0f, 5);
+        pixels.push_back(value);
+      }
     }
   }
   return pixels;

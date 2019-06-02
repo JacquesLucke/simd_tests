@@ -24,6 +24,7 @@ template <unsigned int N> class float_v {
   float_v(float value) : m_low(value), m_high(value) {}
   float_v(float_v<N_Half> low, float_v<N_Half> high)
       : m_low(low), m_high(high) {}
+  float_v(float *values) : m_low(values), m_high(values + N_Half) {}
 
   float_v<N_Half> low() const { return m_low; }
   float_v<N_Half> high() const { return m_high; }
@@ -75,6 +76,7 @@ template <> class float_v<1> {
  public:
   float_v() = default;
   float_v(float value) : m_value(value) {}
+  float_v(float *values) : m_value(values[0]) {}
 
   float value() const { return m_value; }
 
@@ -116,6 +118,8 @@ template <> class float_v<4> {
   float_v(float v) : m_value(_mm_set_ps1(v)) {}
   float_v(float v0, float v1, float v2, float v3)
       : m_value(_mm_set_ps(v3, v2, v1, v0)) {}
+  float_v(float *values)
+      : float_v(values[0], values[1], values[2], values[3]) {}
 
   __m128 m128() const { return m_value; }
 
@@ -165,6 +169,9 @@ template <> class float_v<8> {
   float_v(float v0, float v1, float v2, float v3, float v4, float v5,
           float v6, float v7)
       : m_value(_mm256_set_ps(v7, v6, v5, v4, v3, v2, v1, v0)) {}
+  float_v(float *values)
+      : float_v(values[0], values[1], values[2], values[3], values[4],
+                values[5], values[6], values[7]) {}
 
   __m256 m256() const { return m_value; }
 

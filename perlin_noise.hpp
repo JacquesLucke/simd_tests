@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+
 #include "noise_common.hpp"
 
 /* Evaluate the noise function at N separate positions. */
@@ -58,6 +60,72 @@ static float_v<N> eval_noise(float_v<N> x, float_v<N> y,
   float_v<N> result = interpolate_trilinear(
       x_fac, y_fac, z_fac, corner_lll, corner_llh, corner_lhl,
       corner_lhh, corner_hll, corner_hlh, corner_hhl, corner_hhh);
+
+  return result;
+}
+
+template <unsigned int N>
+float perlin_noise__multi_level(float x, float y, float z,
+                                float_v<N> frequency_factors,
+                                float_v<N> amplitude_factors) {
+  float_v<N> xs = x * frequency_factors;
+  float_v<N> ys = y * frequency_factors;
+  float_v<N> zs = z * frequency_factors;
+
+  float_v<N> raw_values = eval_noise(xs, ys, zs);
+  float_v<N> values = raw_values * amplitude_factors;
+
+  float sum = values.get<0>() + values.get<1>() + values.get<2>() +
+              values.get<3>();
+  return sum;
+}
+
+float perlin_noise(float x, float y, float z, float octaves) {
+  float frequency = 1.0f;
+  float amplitude = 1.0f;
+  float_v<8> frequency_factors_8{1, 2, 4, 8, 16, 32, 64, 128};
+  float_v<8> amplitude_factors_8{1.0f,      1.0f / 2,  1.0f / 4,
+                                 1.0f / 8,  1.0f / 16, 1.0f / 32,
+                                 1.0f / 64, 1.0f / 128};
+  float_v<4> frequency_factors_4 = frequency_factors_8.low();
+  float_v<4> amplitude_factors_4 = amplitude_factors_8.low();
+
+  float result = 0.0f;
+
+  while (octaves > 0.0f) {
+    float amplitudes[4];
+    memset(amplitudes, 0, sizeof(amplitudes));
+    if (octaves <= 1.0f) {
+      amplitudes[0] = octaves;
+    } else {
+      amplitudes[0] = 1.0f;
+      if (octaves <= 2.0f) {
+        amplitudes[1] = octaves - 1.0f;
+      } else {
+        amplitudes[1] = 1.0f;
+        if (octaves <= 3.0f) {
+          amplitudes[2] = octaves - 2.0f;
+        } else {
+          amplitudes[2] = 1.0f;
+          if (octaves <= 4.0f) {
+            amplitudes[3] = octaves - 3.0f;
+          } else {
+            amplitudes[3] = 1.0f;
+          }
+        }
+      }
+    }
+
+    float_v<4> amplitude_factors =
+        amplitude_factors_4 * float_v<4>(amplitudes);
+
+    result += perlin_noise__multi_level(x, y, z, frequency_factors_4,
+                                        amplitude_factors);
+
+    frequency *= (1 << 4);
+    amplitude *= 1.0f / (1 << 4);
+    octaves -= 4.0f;
+  }
 
   return result;
 }
